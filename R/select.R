@@ -1,4 +1,17 @@
-forward_stepwise <- function(X, y, lambda){
+#' Document will be ready soon
+#'
+#' @export
+select.lasso <- function(X, y, lambda){
+  res <- glmnet::glmnet(X, y, lambda = lambda,
+                        intercept = T, standardize = T,
+                        family = "gaussian")
+  as.matrix(res$beta != 0)
+}
+
+#' Document will be ready soon
+#'
+#' @export
+select.fs <- function(X, y, lambda){
   X <- scale(X, center = T, scale = F)
   y <- scale(y, center = T, scale = F)
   X <- scale(X, center = F, scale = sqrt(colSums(X^2)))
@@ -27,4 +40,15 @@ forward_stepwise <- function(X, y, lambda){
   sel_mat <- sel_mat[, n_sels]
 
   return(sel_mat)
+}
+
+#' Document will be ready soon
+#'
+#' @export
+select.glasso <- function(X, lambda){
+  S <- var(X)
+  res <- sapply(lambda, function(rho){
+    hPrecision <- glasso::glasso(S, rho = rho)$wi
+    hPrecision[upper.tri(hPrecision)] != 0
+  })
 }

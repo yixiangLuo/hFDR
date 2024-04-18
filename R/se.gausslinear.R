@@ -2,37 +2,20 @@ se.gausslinear <- function(X, y, select, lambda, psi, n_sample.hfdr, n_sample.se
   p <- NCOL(X)
   n <- NROW(X)
 
-  predict.mle <- function(X.new, X, y){
-    if(NCOL(X) > 0){
-      lm.coefs <- lm(y ~ X + 1)$coefficients
-      coef <- lm.coefs[-1]
-      a0 <- lm.coefs[1]
-
-      if(any(is.na(coef))){
-        coef[is.na(coef)] <- 0
-        warning("singular X created by cross-validation.")
-      }
-      return(X.new %*% coef + a0)
-    } else{
-      return(rep(mean(y), NROW(X.new)))
-    }
-  }
-
   select.token <- select
   if(!is.function(select)){
     if(select == "lasso"){
-      select <- function(X, y, lambda){
-        res <- glmnet::glmnet(X, y, lambda = lambda,
-                              intercept = T, standardize = T,
-                              family = "gaussian")
-        as.matrix(res$beta != 0)
-      }
+      select <- select.lasso
     } else if(select == "fs"){
-      select <- forward_stepwise
+      select <- select.fs
     }
   }
 
-  cv.res <- cv.model(X, y, select, lambda, predict.mle, nfold = 10)
+  predict <- function(X.new, X, y, lambda){
+    predict.model(X.new, X, y, select, lambda, predict.mle.gausslinear)
+  }
+
+  cv.res <- cv.model(X, y, lambda, predict, nfold = 10)
   model <- c(select(X, y, cv.res$lambda.min))
   beta.star <- rep(0, p)
   if(sum(model) > 0){

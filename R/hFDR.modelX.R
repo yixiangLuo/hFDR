@@ -21,12 +21,13 @@ hFDR.modelX <- function(X, y, select, lambda, psi, sampler.modelX, n_sample.hfdr
 
     mc.samples <- forall(mc_i = 1:n_sample.hfdr, .options.multicore = list(preschedule = F)) %exec% {
       X.sample <- X
-      X.sample[, j] <- Xj.samples[, 1, mc_i]
-      res.sample <- select(X.sample, y, lambda)
+      X.sample[, j] <- Xj.samples[, , mc_i]
+      y.sample <- y
+      res.sample <- select(X.sample, y.sample, lambda)
       FDPj.sample <- res.sample[j, ] / pmax(1, colSums(res.sample))
 
       if(is.na(normalizer[j])){
-        psi_j.sample <- psi(X, y.sample, j)$psi
+        psi_j.sample <- psi(X.sample, y.sample, j)$psi
       } else{
         psi_j.sample <- NA
       }
@@ -47,7 +48,7 @@ hFDR.modelX <- function(X, y, select, lambda, psi, sampler.modelX, n_sample.hfdr
   }
   hFDR <- colSums(hFDRj)
 
-  hFDR.result <- list(hFDR = hFDR, hFDRj = hFDRj)
+  hFDR.result <- list(hFDR = hFDR, hFDR.decompose = hFDRj)
 
   return(hFDR.result)
 }

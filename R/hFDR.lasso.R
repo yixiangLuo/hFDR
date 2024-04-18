@@ -49,7 +49,7 @@ hFDR.lasso <- function(data.pack, lambda, psi, n_cores){
 
   hFDR <- colSums(hFDRj)
 
-  return(list(hFDR = hFDR, hFDRj = hFDRj))
+  return(list(hFDR = hFDR, hFDR.decompose = hFDRj))
 }
 
 integral.hFDRj_star <- function(lasso.homopath, j, Xjy_range, data.pack, tol = 1e-7){

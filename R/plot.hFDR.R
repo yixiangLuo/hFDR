@@ -1,3 +1,6 @@
+#' @import graphics
+NULL
+
 #' The plot function
 #'
 #' Document will be ready soon
@@ -71,9 +74,11 @@ plot.hFDR <- function(hFDR.obj, cv.obj, sign.tune = -1, log_lambda = T, log_cv =
   pch <- c(pch, 19)
   col <- c(col, hFDR.color)
 
-  axis(side = 3, at = sign.tune*trans_x(cv.obj$lambda),
-       labels = paste(cv.obj$nzero), tick = FALSE, line = -0.5)
-  mtext("# selections", side = 3, line = 2)
+  if(!is.na(cv.obj$nzero)){
+    axis(side = 3, at = sign.tune*trans_x(cv.obj$lambda),
+         labels = paste(cv.obj$nzero), tick = FALSE, line = -0.5)
+    mtext("# selections", side = 3, line = 2)
+  }
 
   cv.ticks <- if(log_cv){
     seq(exp(cv.range[1]), exp(cv.range[2]), length.out = 6)

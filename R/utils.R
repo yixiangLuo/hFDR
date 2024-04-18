@@ -1,31 +1,11 @@
-lm_to_t <- function(X, y, Sigma = NULL){
-  n <- NROW(X)
-  p <- NCOL(X)
-
-  if(is.null(Sigma)){
-    Sigma <- solve(t(X) %*% X)
-  }
-  Xy <- t(X) %*% y
-  df <- n - p
-
-  zvals <- Sigma %*% Xy
-  sigmahat <- as.numeric(sqrt((sum(y^2) - t(Xy) %*% zvals) / df))
-  tvals <- zvals / sqrt(diag(Sigma)) / sigmahat
-
-  return(list(tvals = tvals, df = df))
+pair_to_index <- function(i, j){
+  (j-1)*(j-2)/2 + i
 }
 
-# compute the p-values of t-statistics
-pvals_t <- function(tvals, df, side = "two"){
-  if (side == "right"){
-    pvals <- pt(tvals, df = df, lower.tail = FALSE)
-  } else if (side == "left"){
-    pvals <- pt(tvals, df = df, lower.tail = TRUE)
-  } else if (side == "two"){
-    pvals <- 2 * pt(abs(tvals), df = df, lower.tail = FALSE)
-  }
-
-  return(pvals)
+index_to_pair <- function(index, p){
+  j <- sum(((2:p)-1)*((2:p)-2)/2 < index) + 1
+  i <- index - (j-1)*(j-2)/2
+  list(i = i, j = j)
 }
 
 Xjy_to_vjy <- function(Xjy, trans, j){

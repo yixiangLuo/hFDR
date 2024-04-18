@@ -19,7 +19,7 @@ set.seed(2024)
 
 # Problem parameters
 n <- 300          # number of observations
-p <- 100           # number of variables
+p <- 10           # number of variables
 k <- 10            # number of variables with nonzero coefficients
 amplitude <- 3.5   # signal amplitude (for noise level = 1)
 
@@ -27,12 +27,12 @@ amplitude <- 3.5   # signal amplitude (for noise level = 1)
 mu <- rep(0,p)
 rho <- 0.25
 Sigma <- toeplitz(rho^(0:(p-1)))
-X <- matrix(rnorm(n*p),n) %*% chol(Sigma)
+X <- t(t(matrix(rnorm(n*p),n) %*% chol(Sigma)) + (1:p)*0)
 
 # Generate the response from a linear model
 nonzero <- sample(p, k)
 beta <- amplitude * (1:p %in% nonzero) / sqrt(n)
-y.sample <- function(X) X %*% beta + rnorm(n)
+y.sample <- function(X) X %*% beta + rnorm(n) + 1000
 y <- y.sample(X)
 
 # generate lamabda sequence for lasso
@@ -40,10 +40,14 @@ gene_lambda <- function(X, y){
   n <- NROW(X)
   p <- NCOL(X)
   
+  y <- scale(y, center = T, scale = F)
+  X <- scale(X, center = T, scale = F)
+  X <- scale(X, center = F, scale = sqrt(colSums(X^2)/n))
+  
   lambda_max <- max(abs(t(X) %*% y)) / n
   sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
   lambda_min <- sigma / n
-  n_lambda <- 100
+  n_lambda <- 10
   lambda_seq <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
   
   return(lambda_seq)
@@ -72,10 +76,24 @@ To begin, we call `hFDR` with the default settings.
 # 
 #   return(list(psi = psi, normalizer = normalizer))
 # }
+# X.mean = (1:p)*0
+# psi <- function(X, y, variables){
+#   psi.modelX.gauss(X, y, variables, X.mean = X.mean, X.cov = Sigma, threshold = 0.1)
+# }
+# 
+# modelX <- list(
+#   sampler.modelX = function(X, ind, sample_size, storage = NULL){
+#     sampler.modelX.gauss(X, ind, X.mean = X.mean, X.cov = Sigma, sample_size, storage)
+#   },
+#   predict.mle = function(X.new, X, y, lambda){
+#     predict.model(X.new, X, y, select, lambda, predict.mle.gausslinear)
+#   }
+# )
+# 
 # tic()
-# result <- hFDR(X, y, model = "gausslinear",
-#                select = "lasso", lambda = lambda, psi = "pval", se = T,
-#                n_sample.hfdr = 20, n_sample.se = 10, n_cores = 14)
+# result <- hFDR(X, y, model = "gaussgraph", modelX = modelX,
+#                select = select.glasso, lambda = lambda, psi = "pval", se = T,
+#                n_sample.hfdr = 20, n_sample.se = 10, n_cores = 1)
 # toc()
 ```
 

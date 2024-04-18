@@ -75,7 +75,7 @@ hFDR.fs <- function(data.pack, lambda, psi){
     }
   }
   hFDR <- colSums(hFDRj)
-  return(list(hFDR = hFDR, hFDRj = hFDRj))
+  return(list(hFDR = hFDR, hFDR.decompose = hFDRj))
 }
 
 

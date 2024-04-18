@@ -1,3 +1,6 @@
+#' @import stats
+NULL
+
 #' The FDR estimator
 #'
 #' Document will be ready soon
@@ -60,33 +63,42 @@ hFDR <- function(X, y = NULL, model = c("gausslinear", "modelX", "gaussgraph"),
       sampler.modelX <- function(X, ind, sample_size, storage = NULL){
         sampler.modelX.gauss(X, ind, X.mean, X.cov, sample_size, storage)
       }
+      predict <- NULL
     } else if(is.list(modelX)){
       if(!is.function(psi)) stop('if `modelX != "auto.gaussian"`, `psi` must be a self-defined function.')
       sampler.modelX <- modelX$sampler.modelX
       if(!is.function(sampler.modelX)){
         stop('if `modelX != "auto.gaussian"`, `modelX` must be a list with modelX$sampler.modelX(X, j, sample_size) being a function that generates `sample_size` samples of X_j conditional on X_{-j}.')
       }
+      predict <- modelX$predict
     } else stop('if `modelX != "auto.gaussian"`, `modelX` must be a list with modelX$sampler.modelX(X, j, sample_size) being a function that generates `sample_size` samples of X_j conditional on X_{-j}.')
 
     if(!is.function(select)){
       if(select == "lasso"){
-        select <- function(X, y, lambda){
-          res <- glmnet::glmnet(X, y, lambda = lambda,
-                                intercept = T, standardize = T,
-                                family = "gaussian")
-          as.matrix(res$beta != 0)
-        }
+        select <- select.lasso
       } else if(select == "fs"){
-        select <- forward_stepwise
+        select <- select.fs
       }
     }
     hFDR.val <- hFDR.modelX(X, y, select, lambda, psi, sampler.modelX, n_sample.hfdr, n_cores)
+    hFDR.se <- if(se){
+      se.modelX(X, y, select, lambda, psi, sampler.modelX, predict, n_sample.hfdr, n_sample.se, n_cores)
+    } else { NA }
+  } else if(model == "gaussgraph"){
+    if(!is.function(select)){
+      stop('`select` must be a function, consider `select = select.glasso` for selection by graphical lasso.')
+    }
+    if(!is.function(psi) && psi == "pval") psi <- psi.gaussgraph
+    hFDR.val <- hFDR.gaussgraph(X, select, lambda, psi, n_sample.hfdr, n_cores)
+    hFDR.se <- if(se){
+      se.gaussgraph(X, select, lambda, psi, n_sample.hfdr, n_sample.se, n_cores)
+    } else { NA }
   }
 
   hFDR.obj <- structure(list(call = match.call(),
                              lambda = lambda,
                              hFDR = hFDR.val$hFDR,
-                             hFDRj = hFDR.val$hFDRj,
+                             hFDR.decompose = hFDR.val$hFDR.decompose,
                              hFDR.se = hFDR.se),
                         class = 'hFDR')
 
