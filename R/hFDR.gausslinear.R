@@ -1,5 +1,3 @@
-
-
 hFDR.gausslinear <- function(X, y, select, lambda, psi, n_sample.hfdr, n_cores){
   if(!is.function(select)){
     data.pack <- preprocess.gausslinear(X, y, select)
@@ -31,7 +29,7 @@ hFDR.gausslinear <- function(X, y, select, lambda, psi, n_sample.hfdr, n_cores){
     for(j in which(psi.val > 0)){
       y.samples <- sampler.gausslinear(y, X[, -j], n_sample.hfdr)
 
-      mc.samples <- forall(mc_i = 1:n_sample.hfdr, .options.multicore = list(preschedule = F)) %exec% {
+      mc.samples <- forall(mc_i = 1:n_sample.hfdr, .options.multicore = list(preschedule = T)) %exec% {
         X.sample <- X
         y.sample <- y.samples[, mc_i]
         res.sample <- select(X.sample, y.sample, lambda)

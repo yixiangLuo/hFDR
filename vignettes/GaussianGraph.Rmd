@@ -1,0 +1,120 @@
+---
+title: "Usage of the hFDR package with Gaussian graphical model"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{GaussianGraph}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+
+This vignette illustrates the usage of the `hFDR` package for estimating the FDR of variable selection procedures in the Gaussian graphical model.
+
+For simplicity, we will use synthetic data constructed from multivariate Gaussian distribution with a sparse precision matrix.
+
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+set.seed(2024)
+library(hFDR)
+```
+
+```{r define-problem, results='hide', message=FALSE, warning=FALSE}
+# Problem parameters
+p <- 15            # number of variables
+n <- 500           # number of observations
+k <- 10            # number of variables with nonzero coefficients
+amplitude <- 0.2   # signal amplitude
+
+# Generate a sparse precision matrix (positive definte)
+nonzero.row <- sample(p-1, k)
+nonzero.col <- sapply(nonzero.row, function(row){sample((row+1):p, 1)})
+nonzero <- sapply(1:k, function(ind){hFDR:::pair_to_index(nonzero.row[ind], nonzero.col[ind])})
+
+Precision <- diag(p)
+for(ind in 1:k) Precision[nonzero.row[ind], nonzero.col[ind]] <- amplitude
+Precision <- (Precision + t(Precision))/2
+
+# Generate the variables from a multivariate normal distribution
+Sigma <- solve(Precision)
+X <- matrix(rnorm(n*p), n) %*% chol(Sigma)
+
+# generate lambda sequence for lasso
+n_lambda <- 40
+lambda_max <- max(abs(t(X) %*% X)) / n
+lambda_min <- lambda_max / 100
+lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
+```
+
+Example 1. Graphical Lasso selection for nonzero entries in the precision matrix
+--------------
+
+To start with, we call `hFDR` for graphical lasso with the default settings.
+```{r hFDR-glasso, message=F, warning=F, fig.width=7, fig.height=4.5}
+hFDR.res <- hFDR(X, y, model = "gaussgraph", select = select.glasso, lambda = lambda,
+                 psi = "pval", n_cores = 2)
+plot(hFDR.res)
+```
+
+Now estimate standard error of the FDR estimator and plot it in company with 
+cross-validation.
+```{r hFDR-glasso-cv, message=F, warning=F, fig.width=7, fig.height=4.5}
+# do cross-validation for glasso
+cv.res <- cv.gaussgraph(X, lambda, precision.est.glasso, select = select.glasso,
+                        type.measure = "-loglikelihood", nfold = 10)
+hFDR.res <- hFDR(X, y, model = "gaussgraph", select = select.glasso, lambda = lambda,
+                 psi = "pval", se = T,
+                 n_sample.hfdr = 20, n_sample.se = 10, n_cores = 2)
+plot(hFDR.res, cv.res)
+```
+
+Compare with FDR and FDP in the simulation setting.
+```{r hFDR-FDR-lasso, message=F, warning=F, fig.width=7, fig.height=4.5}
+calc_FDP <- function(selected, nonzero){
+  p <- NROW(selected)
+  nonzero <- (1:p) %in% nonzero
+  colSums(selected * !nonzero) / pmax(colSums(selected), 1)
+}
+
+FDP <- calc_FDP(select.glasso(X, lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  X.mc <- matrix(rnorm(n*p), n) %*% chol(Sigma)
+  calc_FDP(select.glasso(X.mc, lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+
+plot(hFDR.res, cv.res)
+lines(x = -log(lambda), y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = -log(lambda), y = FDR, col = "black", lty = 1)  # solid black line for FDR
+```
+
+Example 2. User-defined selection procedures with Monte-Carlo calculation
+--------------
+The selection procedure is up to the user to choose. Here give an example with selection is via p-value thresholding.
+```{r hFDR-user-defined, message=F, warning=F, fig.width=7, fig.height=4.5}
+# select by p-value thresholding
+select.my <- function(X, lambda){
+  sapply(lambda, function(t){!psi.gaussgraph(X, 1:(p*(p-1)/2), threshold = t)$psi})
+}
+# self-defined psi function -- using 0.5 p-value thresholds
+psi.my <- function(X, pair_inds){
+  psi.gaussgraph(X, pair_inds, threshold = 0.5)
+}
+
+lambda <- seq(0, 0.5, length.out = 10)
+
+hFDR.res <- hFDR(X, y, model = "gaussgraph", select = select.my, lambda = lambda,
+                 psi = psi.my, se = F, n_sample.hfdr = 20, n_cores = 2)
+
+plot(hFDR.res, sign.lambda = 1, log_lambda = F)
+
+# compare with FDR and FDP in the simulation setting
+FDP <- calc_FDP(select.my(X, lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  X.mc <- matrix(rnorm(n*p), n) %*% chol(Sigma)
+  calc_FDP(select.my(X.mc, lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+lines(x = lambda, y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = lambda, y = FDR, col = "black", lty = 1)  # solid black line for FDR
+```

@@ -19,7 +19,7 @@ hFDR.modelX <- function(X, y, select, lambda, psi, sampler.modelX, n_sample.hfdr
   for(j in which(psi.val > 0)){
     Xj.samples <- sampler.modelX(X, j, n_sample.hfdr)
 
-    mc.samples <- forall(mc_i = 1:n_sample.hfdr, .options.multicore = list(preschedule = F)) %exec% {
+    mc.samples <- forall(mc_i = 1:n_sample.hfdr, .options.multicore = list(preschedule = T)) %exec% {
       X.sample <- X
       X.sample[, j] <- Xj.samples[, , mc_i]
       y.sample <- y

@@ -1,5 +1,5 @@
 ---
-title: "Usage of the hFDR procedure with Gaussian Linear models"
+title: "Usage of the hFDR package with Gaussian Linear models"
 date: "`r Sys.Date()`"
 output: rmarkdown::html_vignette
 vignette: >
@@ -9,103 +9,161 @@ vignette: >
 ---
 
 
+This vignette illustrates the usage of the `hFDR` package for estimating the FDR of variable selection procedures in the Gaussian linear model.
+
+For simplicity, we will use synthetic data constructed from a linear model such that the response only depends on a small fraction of the variables.
+
 
 ```{r, results='hide', message=FALSE, warning=FALSE}
 set.seed(2024)
+library(hFDR)
 ```
 
-```{r define-problem}
-set.seed(2024)
-
+```{r define-problem, results='hide', message=FALSE, warning=FALSE}
 # Problem parameters
-n <- 300          # number of observations
-p <- 10           # number of variables
-k <- 10            # number of variables with nonzero coefficients
-amplitude <- 3.5   # signal amplitude (for noise level = 1)
+p <- 100           # number of variables
+n <- 300           # number of observations
+k <- 15            # number of variables with nonzero coefficients
+amplitude <- 3   # signal amplitude (for noise level = 1)
 
 # Generate the variables from a multivariate normal distribution
 mu <- rep(0,p)
 rho <- 0.25
 Sigma <- toeplitz(rho^(0:(p-1)))
-X <- t(t(matrix(rnorm(n*p),n) %*% chol(Sigma)) + (1:p)*0)
+X <- matrix(rnorm(n*p), n) %*% chol(Sigma)
 
 # Generate the response from a linear model
 nonzero <- sample(p, k)
 beta <- amplitude * (1:p %in% nonzero) / sqrt(n)
-y.sample <- function(X) X %*% beta + rnorm(n) + 1000
-y <- y.sample(X)
-
-# generate lamabda sequence for lasso
-gene_lambda <- function(X, y){
-  n <- NROW(X)
-  p <- NCOL(X)
-  
-  y <- scale(y, center = T, scale = F)
-  X <- scale(X, center = T, scale = F)
-  X <- scale(X, center = F, scale = sqrt(colSums(X^2)/n))
-  
-  lambda_max <- max(abs(t(X) %*% y)) / n
-  sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
-  lambda_min <- sigma / n
-  n_lambda <- 10
-  lambda_seq <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
-  
-  return(lambda_seq)
-}
-lambda <- gene_lambda(X, y)
+y.sample <- function() X %*% beta + rnorm(n) + 100
+y <- y.sample()
 ```
 
-First examples
+Example 1. Lasso selection with built-in algorithm
 --------------
 
-To begin, we call `hFDR` with the default settings.
-```{r hFDR-default, results='hide', message=F, warning=F}
-# library(hFDR)
-# library(tictoc)
-# select <- function(X, y, lambda){
-#   res <- glmnet::glmnet(X, y, lambda = lambda,
-#                         intercept = T, standardize = T,
-#                         family = "gaussian")
-#   res <- as.matrix(res$beta != 0)
-# }
-# psi <- function(X, y, variables, threshold = 0.1){
-#   tvals <- lm_to_t(X, y)
-#   pvals <- pvals_t(tvals$tvals, tvals$df, side = "two")[variables]
-#   psi <- 2*(pvals > threshold)
-#   normalizer <- 2*rep(1 - threshold, length(variables))
-# 
-#   return(list(psi = psi, normalizer = normalizer))
-# }
-# X.mean = (1:p)*0
-# psi <- function(X, y, variables){
-#   psi.modelX.gauss(X, y, variables, X.mean = X.mean, X.cov = Sigma, threshold = 0.1)
-# }
-# 
-# modelX <- list(
-#   sampler.modelX = function(X, ind, sample_size, storage = NULL){
-#     sampler.modelX.gauss(X, ind, X.mean = X.mean, X.cov = Sigma, sample_size, storage)
-#   },
-#   predict.mle = function(X.new, X, y, lambda){
-#     predict.model(X.new, X, y, select, lambda, predict.mle.gausslinear)
-#   }
-# )
-# 
-# tic()
-# result <- hFDR(X, y, model = "gaussgraph", modelX = modelX,
-#                select = select.glasso, lambda = lambda, psi = "pval", se = T,
-#                n_sample.hfdr = 20, n_sample.se = 10, n_cores = 1)
-# toc()
+In the Gaussian linear model with argument `select = "lasso"`, we use a homotopy algorithm to compute the FDR estimator. This algorithm is fast for a large lambda (not many 
+selections) and become slower for a smaller lambda (many selections). And it computes FDR
+estimation for each lambda separately.
+
+For efficiency consideration, it is recommended to compute for a few values of lambda and avoid very small lambda.
+```{r lasso-lambda, results='hide', message=FALSE, warning=FALSE}
+# generate lambda sequence for lasso
+n_lambda <- 40
+lambda_max <- max(abs(t(scale(X, T, F)) %*% scale(y, T, F))) / n
+sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
+lambda_min <- sigma / sqrt(n) / 10
+lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
 ```
 
-
-```{r hFDR-cv, results='hide', message=F, warning=F}
-# library(hFDR)
-# library(glmnet)
-# lasso.cv <- cv.glmnet(X, y, lambda = lambda, alpha = 1, nfolds = 10,
-#                       intercept = T, standardize = T, family = "gaussian")
-# hFDR.obj <- hFDR(X, y, model = "gausslinear", select = "lasso",
-#                  lambda = lasso.cv$lambda, nlambda = 40, n_cores = 14)
-# 
-# plot(hFDR.obj, lasso.cv)
+To start with, we call `hFDR` for Lasso with the default settings.
+```{r hFDR-lasso, message=F, warning=F, fig.width=7, fig.height=4.5}
+hFDR.res <- hFDR(X, y, model = "gausslinear", select = "lasso", lambda = lambda,
+                 psi = "pval", n_cores = 2)
+plot(hFDR.res)
 ```
 
+Now estimate standard error of the FDR estimator and plot it in company with 
+cross-validation.
+```{r hFDR-lasso-cv, message=F, warning=F, fig.width=7, fig.height=4.5}
+glmnet.cv <- glmnet::cv.glmnet(X, y, alpha = 1, nfolds = 10,
+                               intercept = T, standardize = T, family = "gaussian")
+
+hFDR.res <- hFDR(X, y, model = "gausslinear", select = "lasso", lambda = lambda,
+                 psi = "pval", se = T, n_sample.se = 10, n_cores = 2)
+
+plot(hFDR.res, glmnet.cv)
+```
+
+Compare with FDR and FDP in the simulation setting.
+```{r hFDR-FDR-lasso, message=F, warning=F, fig.width=7, fig.height=4.5}
+calc_FDP <- function(selected, nonzero){
+  p <- NROW(selected)
+  nonzero <- (1:p) %in% nonzero
+  colSums(selected * !nonzero) / pmax(colSums(selected), 1)
+}
+
+FDP <- calc_FDP(select.lasso(X, y, lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  y.mc <- y.sample()
+  calc_FDP(select.lasso(X, y.mc, lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+
+plot(hFDR.res, glmnet.cv)
+lines(x = -log(lambda), y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = -log(lambda), y = FDR, col = "black", lty = 1)  # solid black line for FDR
+```
+
+Example 2. forward stepwise selection with built-in algorithm
+--------------
+
+Next we see forward stepwise selection with built-in algorithm.
+```{r hFDR-fs, message=F, warning=F, fig.width=7, fig.height=4.5}
+lambda <- 1:40   # number of steps
+
+# do cross-validation for forward stepwise regression
+## fit the forward stepwise regression and make predictions.
+pred_fit.fs <- function(X.new, X, y, lambda){
+  pred_fit.model(X.new, X, y, select.fs, lambda, pred_fit.mle.gausslinear)
+}
+## do cross-validation with pred_fit.fs
+cv.res <- cv.model(X, y, lambda, pred_fit.fs, select = select.fs, nfold = 10)
+
+# compute FDR estimator for forward stepwise selection
+hFDR.res <- hFDR(X, y, model = "gausslinear", select = "fs", lambda = lambda,
+                 psi = "pval", se = T, n_sample.se = 10, n_cores = 2)
+
+plot(hFDR.res, cv.res, sign.lambda = 1, log_lambda = F)
+
+# compare with FDR and FDP in the simulation setting
+FDP <- calc_FDP(select.fs(X, y, lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  y.mc <- y.sample()
+  calc_FDP(select.fs(X, y.mc, lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+lines(x = lambda, y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = lambda, y = FDR, col = "black", lty = 1)  # solid black line for FDR
+```
+
+Example 3. User-defined selection procedures with Monte-Carlo calculation
+--------------
+The selection procedure is up to the user to choose. Monte-Carlo is employed in calculating FDR estimation.
+```{r hFDR-user-defined, message=F, warning=F, fig.width=7, fig.height=4.5}
+# select by p-value thresholding
+select.my <- function(X, y, lambda){
+  pvals <- summary(lm(y ~ X + 1))$coefficients[-1, 4]
+  sapply(lambda, function(t){pvals < t})
+}
+# self-defined psi function -- using 0.2 p-value thresholds
+psi.my <- function(X, y, variables){
+  psi.guasslinear(X, y, variables, threshold = 0.5)
+}
+
+lambda <- seq(0, 0.5, length.out = 50)
+
+# do cross-validation for OLS on the p-value thresholding selected variables
+## fit the OLS on the selected variables and make predictions.
+pred_fit.my <- function(X.new, X, y, lambda){
+  pred_fit.model(X.new, X, y, select.my, lambda, pred_fit.mle.gausslinear)
+}
+## do cross-validation with pred_fit.my
+cv.res <- cv.model(X, y, lambda, pred_fit.my, select = select.my, nfold = 10)
+
+hFDR.res <- hFDR(X, y, model = "gausslinear", select = select.my, lambda = lambda,
+                 psi = psi.my, se = T,
+                 n_sample.hfdr = 20, n_sample.se = 10, n_cores = 1)
+
+plot(hFDR.res, cv.res, sign.lambda = 1, log_lambda = F)
+
+# compare with FDR and FDP in the simulation setting
+FDP <- calc_FDP(select.my(X, y, lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  y.mc <- y.sample()
+  calc_FDP(select.my(X, y.mc, lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+lines(x = lambda, y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = lambda, y = FDR, col = "black", lty = 1)  # solid black line for FDR
+```

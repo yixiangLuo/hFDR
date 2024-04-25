@@ -1,4 +1,4 @@
-preprocess.gausslinear <- function(X, y, select, discard_tail_prob = 1e-4){
+preprocess.gausslinear <- function(X, y, select, truncate_prob = 1e-4){
   n <- NROW(X)
   p <- NCOL(X)
 
@@ -37,26 +37,11 @@ preprocess.gausslinear <- function(X, y, select, discard_tail_prob = 1e-4){
 
   trans <- list(Xv = Xv, X_perpv_y = X_perpv_y)
 
-  vy_bound <- pmax(abs(vjy_quantile(discard_tail_prob, RSS_Xnoj, df = n-p)), abs(vjy_obs))
-  Xy_bound <- sapply(1:p, function(j){
-    sort(c(vjy_to_Xjy(-vy_bound[j], trans, j),
-           vjy_to_Xjy(vy_bound[j], trans, j)))
-  })
-
   data.pack <- list(X = X, y = y, n = n, p = p, vj_mat = vj_mat, vjy_obs = vjy_obs,
                     RSS_X = RSS_X, RSS_Xnoj = RSS_Xnoj,
-                    trans = trans, Xy_bound = Xy_bound)
+                    trans = trans)
 
   return(data.pack)
 }
 
 
-vjy_quantile <- function(prob, res_norm2, df){
-  t_quantile <- qt(prob, df)
-  if(abs(t_quantile) < Inf){
-    vjy <- sign(t_quantile) * sqrt(t_quantile^2 * res_norm2 / (t_quantile^2 + df))
-  } else{
-    vjy <- sign(t_quantile) * sqrt(res_norm2)
-  }
-  return(vjy)
-}

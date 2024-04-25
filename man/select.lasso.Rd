@@ -2,10 +2,22 @@
 % Please edit documentation in R/select.R
 \name{select.lasso}
 \alias{select.lasso}
-\title{Document will be ready soon}
+\title{Variable selection by glmnet lasso}
 \usage{
 select.lasso(X, y, lambda)
 }
+\arguments{
+\item{X}{n-by-p matrix of explanatory variables.}
+
+\item{y}{response vector of length n.}
+
+\item{lambda}{regularity parameter sequence.}
+}
+\value{
+a logical matrix of size p-by-length(lambda). An entry equals True
+iff the corresponding variable (row) is selected at the corresponding lambda
+(column).
+}
 \description{
-Document will be ready soon
+Variable selection by glmnet lasso
 }

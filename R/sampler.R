@@ -22,17 +22,37 @@ sampler.gausslinear <- function(var, basis, sample_size){
   return(var.sample)
 }
 
-sampler.modelX.gauss <- function(X, ind, X.mean, X.cov, sample_size, storage = NULL){
+#' Model-X conditional sampler
+#'
+#' Generates samples of some variables conditioning on the others in the model-X
+#' setting.
+#'
+#' @param X n-by-p matrix of explanatory variables.
+#' @param indices non-empty vector of indices of variables that are to be generated
+#' samples. If \code{indices=1:p}, it generates unconditional samples of all
+#' variables.
+#' @param X.mean length p mean vector of the explanatory variables.
+#' @param X.cov p-by-p covariance matrix of explanatory variables.
+#' @param sample_size the number of samples to be generated.
+#' @param storage an R environment that holds intermediate results to save
+#' computational time when the function is calling repeatively in
+#' \code{hFDR:::se.modelX}.
+#'
+#' @return a n-by-length(indices)-by-sample_size array that holds the samples of
+#' variables indexed by indices.
+#'
+#' @export
+sampler.modelX.gauss <- function(X, indices, X.mean, X.cov, sample_size, storage = NULL){
   if(is.environment(storage) && !is.null(storage$R.cond)){
     trans.mat <- storage$trans.mat
     R.cond <- storage$R.cond
   } else{
-    if(length(ind) < NCOL(X)){
-      trans.mat <- X.cov[ind, -ind, drop = F] %*% solve(X.cov[-ind, -ind, drop = F])
-      cov.cond <- X.cov[ind, ind, drop = F] - trans.mat %*% X.cov[-ind, ind, drop = F]
+    if(length(indices) < NCOL(X)){
+      trans.mat <- X.cov[indices, -indices, drop = F] %*% solve(X.cov[-indices, -indices, drop = F])
+      cov.cond <- X.cov[indices, indices, drop = F] - trans.mat %*% X.cov[-indices, indices, drop = F]
       R.cond <- chol(cov.cond)
     } else{
-      trans.mat <- X.cov[ind, -ind, drop = F]
+      trans.mat <- X.cov[indices, -indices, drop = F]
       R.cond <- chol(X.cov)
     }
 
@@ -43,8 +63,8 @@ sampler.modelX.gauss <- function(X, ind, X.mean, X.cov, sample_size, storage = N
   }
 
   n <- NROW(X)
-  mean.cond <- t(X.mean[ind] + trans.mat %*% (t(X[, -ind, drop = F]) - X.mean[-ind]))
-  X.ind.samples <- replicate(sample_size, mean.cond + matrix(rnorm(n * length(ind)), nrow = n) %*% R.cond)
+  mean.cond <- t(X.mean[indices] + trans.mat %*% (t(X[, -indices, drop = F]) - X.mean[-indices]))
+  X.indices.samples <- replicate(sample_size, mean.cond + matrix(rnorm(n * length(indices)), nrow = n) %*% R.cond)
 }
 
 sampler.gaussgraph <- function(X, i, j, sample_size){

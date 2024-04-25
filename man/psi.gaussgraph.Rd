@@ -2,10 +2,29 @@
 % Please edit documentation in R/psi.R
 \name{psi.gaussgraph}
 \alias{psi.gaussgraph}
-\title{Document will be ready soon}
+\title{Default psi function in the Gaussian graphical model that
+thresholds variables by their two-sided t-test p-values.}
 \usage{
 psi.gaussgraph(X, pair_inds, threshold = 0.1)
 }
+\arguments{
+\item{X}{n-by-p matrix of the variables.}
+
+\item{pair_inds}{a sequence of indices of pairs of variables whose psi is to
+be calculated. Converting a variable pair (i,j) to the pair index and vice
+versa can be found in hFDR:::pair_to_index and hFDR:::index_to_pair.}
+
+\item{threshold}{psi = 1 if the p-value of the variable is above threshold,
+otherwise psi = 0.}
+}
+\value{
+a list.
+ \item{psi}{psi values of the variables}
+ \item{normalizer}{the conditional expectation of psi given Sj and under the
+ null Hj. This item is optional. If normalizer is not specified (NULL), it
+ will be calculated approximately when called by hFDR::hFDR using Monte-Carlo.}
+}
 \description{
-Document will be ready soon
+Default psi function in the Gaussian graphical model that
+thresholds variables by their two-sided t-test p-values.
 }

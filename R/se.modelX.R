@@ -1,10 +1,9 @@
-
-se.modelX <- function(X, y, select, lambda, psi, sampler.modelX, predict = NULL, n_sample.hfdr, n_sample.se, n_cores = 1){
+se.modelX <- function(X, y, select, lambda, psi, sampler.modelX, pred_fit = NULL, n_sample.hfdr, n_sample.se, n_cores = 1){
   p <- NCOL(X)
   n <- NROW(X)
 
-  if(is.function(predict)){
-    cv.res <- cv.model(X, y, lambda, predict, nfold = 10)
+  if(is.function(pred_fit)){
+    cv.res <- cv.model(X, y, lambda, pred_fit, nfold = 10)
     model <- c(select(X, y, cv.res$lambda.min))
   } else{
     model <- (psi(X, y, 1:p)$psi == 0)

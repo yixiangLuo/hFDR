@@ -1,4 +1,12 @@
-#' Document will be ready soon
+#' Variable selection by glmnet lasso
+#'
+#' @param X n-by-p matrix of explanatory variables.
+#' @param y response vector of length n.
+#' @param lambda regularity parameter sequence.
+#'
+#' @return a logical matrix of size p-by-length(lambda). An entry equals True
+#' iff the corresponding variable (row) is selected at the corresponding lambda
+#' (column).
 #'
 #' @export
 select.lasso <- function(X, y, lambda){
@@ -8,7 +16,15 @@ select.lasso <- function(X, y, lambda){
   as.matrix(res$beta != 0)
 }
 
-#' Document will be ready soon
+#' Variable selection by forward stepwise regression
+#'
+#' @param X n-by-p matrix of explanatory variables.
+#' @param y response vector of length n.
+#' @param lambda regularity parameter sequence.
+#'
+#' @return a logical matrix of size p-by-length(lambda). An entry equals True
+#' iff the corresponding variable (row) is selected at the corresponding lambda
+#' (column).
 #'
 #' @export
 select.fs <- function(X, y, lambda){
@@ -42,7 +58,34 @@ select.fs <- function(X, y, lambda){
   return(sel_mat)
 }
 
-#' Document will be ready soon
+#' Variable selection by glmnet logistic regression
+#'
+#' @param X n-by-p matrix of explanatory variables.
+#' @param y binary response vector of length n.
+#' @param lambda regularity parameter sequence.
+#'
+#' @return a logical matrix of size p-by-length(lambda). An entry equals True
+#' iff the corresponding variable (row) is selected at the corresponding lambda
+#' (column).
+#'
+#' @export
+select.logistic <- function(X, y, lambda){
+  res <- glmnet::glmnet(X, y, lambda = lambda,
+                        intercept = T, standardize = T,
+                        family = "binomial")
+  res <- as.matrix(res$beta != 0)
+}
+
+
+#' Conditionally dependence pair selection by graphical lasso
+#'
+#' @param X n-by-p matrix of multivariate Gaussian variables.
+#' @param lambda regularity parameter sequence.
+#'
+#' @return a logical matrix of size (p(p-1)/2)-by-length(lambda). An entry equals
+#'  True iff the corresponding pair (row) is selected at the corresponding
+#'  lambda (column). Converting a variable pair (i,j) to the column index and
+#'  vice versa can be found in hFDR:::pair_to_index and hFDR:::index_to_pair.
 #'
 #' @export
 select.glasso <- function(X, lambda){

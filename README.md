@@ -11,51 +11,63 @@ devtools::install_github("yixiangluo/hFDR")
 
 ## Simple example with Lasso
 
+We show a simple example with Lasso selection. Please see more examples in the vignettes `GaussianLinear`, `ModelX`, and `GaussianGraph`.
+
 ``` r
 set.seed(2024)
 
 # Problem parameters
-n <- 300          # number of observations
 p <- 100           # number of variables
-k <- 10            # number of variables with nonzero coefficients
-amplitude <- 3.5   # signal amplitude (for noise level = 1)
+n <- 300           # number of observations
+k <- 15            # number of variables with nonzero coefficients
+amplitude <- 3   # signal amplitude (for noise level = 1)
 
 # Generate the variables from a multivariate normal distribution
 mu <- rep(0,p)
 rho <- 0.25
 Sigma <- toeplitz(rho^(0:(p-1)))
-X <- matrix(rnorm(n*p),n) %*% chol(Sigma)
+X <- matrix(rnorm(n*p), n) %*% chol(Sigma)
 
 # Generate the response from a linear model
 nonzero <- sample(p, k)
 beta <- amplitude * (1:p %in% nonzero) / sqrt(n)
-y.sample <- function(X) X %*% beta + rnorm(n)
-y <- y.sample(X)
+y.sample <- function() X %*% beta + rnorm(n) + 100
+y <- y.sample()
 
-# generate lamabda sequence for lasso
-gene_lambda <- function(X, y){
-  n <- NROW(X)
-  p <- NCOL(X)
-  
-  lambda_max <- max(abs(t(X) %*% y)) / n
-  sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
-  lambda_min <- sigma / n
-  n_lambda <- 100
-  lambda_seq <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
-  
-  return(lambda_seq)
-}
-lambda <- gene_lambda(X, y)
+# generate lambda sequence for lasso
+n_lambda <- 40
+lambda_max <- max(abs(t(scale(X, T, F)) %*% scale(y, T, F))) / n
+sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
+lambda_min <- sigma / sqrt(n) / 10
+lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
 ```
 
 ``` r
 library(hFDR)
 library(glmnet)
-lasso.cv <- cv.glmnet(X, y, lambda = lambda, alpha = 1, nfolds = 10,
-                      intercept = T, standardize = T, family = "gaussian")
-hFDR.obj <- hFDR(X, y, model = "gausslinear", select = "lasso",
-                 lambda = lasso.cv$lambda, nlambda = 40, n_cores = 14)
+glmnet.cv <- glmnet::cv.glmnet(X, y, alpha = 1, nfolds = 10,
+                               intercept = T, standardize = T, family = "gaussian")
 
-plot(hFDR.obj, lasso.cv)
+hFDR.res <- hFDR(X, y, model = "gausslinear", select = "lasso", lambda = lambda,
+                 psi = "pval", se = T, n_sample.se = 10, n_cores = 2)
+
+
+# Compare with FDR and FDP in the simulation setting
+calc_FDP <- function(selected, nonzero){
+  p <- NROW(selected)
+  nonzero <- (1:p) %in% nonzero
+  colSums(selected * !nonzero) / pmax(colSums(selected), 1)
+}
+
+FDP <- calc_FDP(select.lasso(X, y, lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  y.mc <- y.sample()
+  calc_FDP(select.lasso(X, y.mc, lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+
+plot(hFDR.res, glmnet.cv)
+lines(x = -log(lambda), y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = -log(lambda), y = FDR, col = "black", lty = 1)  # solid black line for FDR
 ```
 ![hFDR example](readme/hFDR_example.png)

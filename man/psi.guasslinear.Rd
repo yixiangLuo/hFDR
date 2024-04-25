@@ -2,10 +2,30 @@
 % Please edit documentation in R/psi.R
 \name{psi.guasslinear}
 \alias{psi.guasslinear}
-\title{Document will be ready soon}
+\title{Default psi function in Gaussian linear model that thresholds variables by
+their two-sided t-test p-values.}
 \usage{
 psi.guasslinear(X, y, variables, threshold = 0.1)
 }
+\arguments{
+\item{X}{n-by-p matrix of explanatory variables.}
+
+\item{y}{response vector of length n.}
+
+\item{variables}{a sequence of indices of variables whose psi is to be
+calculated.}
+
+\item{threshold}{psi = 1 if the p-value of the variable is above threshold,
+otherwise psi = 0.}
+}
+\value{
+a list.
+ \item{psi}{psi values of the variables}
+ \item{normalizer}{the conditional expectation of psi given Sj and under the
+ null Hj. This item is optional. If normalizer is not specified (NULL), it
+ will be calculated approximately when called by hFDR::hFDR using Monte-Carlo.}
+}
 \description{
-Document will be ready soon
+Default psi function in Gaussian linear model that thresholds variables by
+their two-sided t-test p-values.
 }

@@ -1,4 +1,9 @@
-#' Document will be ready soon
+#' Estimate the precision matrix by graphical lasso
+#'
+#' @param X n-by-p matrix of multivariate Gaussian variables.
+#' @param lambda regularity parameter sequence.
+#'
+#' @return the estimated precision matrix.
 #'
 #' @export
 precision.est.glasso <- function(X, lambda){
@@ -7,6 +12,8 @@ precision.est.glasso <- function(X, lambda){
   return(hPrecision)
 }
 
+# Estimate the MLE precision matrix under the constrained that Precision[i,j]=0
+# if pair (i,j) is not selected by `select`
 precision.est.mle.sparse <- function(X, select, lambda, precise = F){
   p <- NCOL(X)
   n <- NROW(X)

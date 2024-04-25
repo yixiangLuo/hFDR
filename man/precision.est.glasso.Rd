@@ -2,10 +2,18 @@
 % Please edit documentation in R/precision.est.R
 \name{precision.est.glasso}
 \alias{precision.est.glasso}
-\title{Document will be ready soon}
+\title{Estimate the precision matrix by graphical lasso}
 \usage{
 precision.est.glasso(X, lambda)
 }
+\arguments{
+\item{X}{n-by-p matrix of multivariate Gaussian variables.}
+
+\item{lambda}{regularity parameter sequence.}
+}
+\value{
+the estimated precision matrix.
+}
 \description{
-Document will be ready soon
+Estimate the precision matrix by graphical lasso
 }

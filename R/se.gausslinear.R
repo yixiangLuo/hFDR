@@ -11,11 +11,11 @@ se.gausslinear <- function(X, y, select, lambda, psi, n_sample.hfdr, n_sample.se
     }
   }
 
-  predict <- function(X.new, X, y, lambda){
-    predict.model(X.new, X, y, select, lambda, predict.mle.gausslinear)
+  pred_fit <- function(X.new, X, y, lambda){
+    pred_fit.model(X.new, X, y, select, lambda, pred_fit.mle.gausslinear)
   }
 
-  cv.res <- cv.model(X, y, lambda, predict, nfold = 10)
+  cv.res <- cv.model(X, y, lambda, pred_fit, nfold = 10)
   model <- c(select(X, y, cv.res$lambda.min))
   beta.star <- rep(0, p)
   if(sum(model) > 0){

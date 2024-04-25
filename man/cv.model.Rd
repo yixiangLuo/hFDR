@@ -2,10 +2,50 @@
 % Please edit documentation in R/cv.model.R
 \name{cv.model}
 \alias{cv.model}
-\title{Document will be ready soon}
+\title{Cross-validation for a generic predictive model.}
 \usage{
-cv.model(X, y, lambda, predict, select = NULL, nfold = 10)
+cv.model(X, y, lambda, pred_fit, select = NULL, nfold = 10)
+}
+\arguments{
+\item{X}{n-by-p matrix of explanatory variables.}
+
+\item{y}{response vector of length n.}
+
+\item{lambda}{regularity parameter sequence.}
+
+\item{pred_fit}{a function that takes arguments (X.new, X, y, lambda). It
+train a model with (X, y) at regularity parameters lambda and predict the
+response at X.new. The return must be a matrix of size NROW(X.new) by
+length(lambda).}
+
+\item{select}{a function that takes arguments (X, y, lambda) and does
+variable selection. The return must be a logical matrix of size p by
+length(lambda).}
+
+\item{nfold}{number of folds in cross-validation.}
+}
+\value{
+An object of class \code{cv.obj} that has similar structure as
+\code{cv.glmnet}.
+ \item{lambda}{the values of lambda used in the fits.}
+ \item{cvm}{the mean cross-validated error - a vector of length
+ length(lambda).}
+ \item{cvsd}{estimate of standard error of cvm.}
+ \item{cvup}{upper curve = cvm+cvsd.}
+ \item{cvlo}{lower curve = cvm-cvsd.}
+ \item{nzero}{number of selected variables at each lambda. NA if augument
+ \code{select} is NULL.}
+ \item{name}{a text string indicating type of measure (for plotting purposes).}
+ \item{lambda.min}{value of lambda that gives minimum cvm.}
+ \item{lambda.1se}{largest value of lambda such that error is within 1
+ standard error of the minimum.}
+ \item{index}{a one column matrix with the indices of lambda.min and
+ lambda.1se.}
 }
 \description{
-Document will be ready soon
+Cross-validation for a generic predictive model.
+}
+\examples{
+# Please see vignettes "GaussianLinear" and "ModelX"
+
 }

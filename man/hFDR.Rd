@@ -2,7 +2,7 @@
 % Please edit documentation in R/hFDR.R
 \name{hFDR}
 \alias{hFDR}
-\title{The FDR estimator}
+\title{FDR estimator}
 \usage{
 hFDR(
   X,
@@ -13,12 +13,116 @@ hFDR(
   lambda,
   nlambda = length(lambda),
   psi = "pval",
-  se = T,
+  se = F,
   n_sample.hfdr = 20,
   n_sample.se = 10,
   n_cores = 1
 )
 }
+\arguments{
+\item{X}{n-by-p matrix of explanatory variables.}
+
+\item{y}{response vector of length n. It is unused in the Gaussian graphical
+model.}
+
+\item{model}{specifies the model assumption. "gausslinear" for the Gaussian
+linear model, "modelX" for the model-X setttings, and "gaussgraph" for the
+Gaussian graphical model.}
+
+\item{modelX}{only used in the model-X settings to specify the model
+assumptions. When it equals "auto.gaussian" (default), the explanatory
+variables X are considered multivariate Gaussian with the mean and covariance
+estiamted from the observed data. If users want to specify the distribution
+of X, then argument \code{modelX} should be a list of functions that contains
+a conditional sampling function for X. See details.}
+
+\item{select}{Variable selection procedure. Either a string "lasso" or "fs"
+in the Gaussian linear model or a function that takes arguments (X, y, lambda)
+and does variable selection. The return of the function must be a logical
+matrix indicating being selected of size p by length(lambda).
+If \code{select} is "lasso" or "fs", \code{model} must be "gausslinear". They
+correspond to variable selection by lasso (hFDR::select.lasso) or by forward
+stepwise regression (hFDR::select.fs). Built-in fast algorithms is used to
+compute the FDR estimation.
+If \code{select} is a function, Monte-Carlo with \code{n_sample.hfdr} samples
+is used to compute the FDR estimation.}
+
+\item{lambda}{regularity parameter sequence.}
+
+\item{nlambda}{downsample the \code{lambda} sequence to be of length
+\code{nlambda}.}
+
+\item{psi}{the psi function to reduce the bias of the estimated FDR. Either a
+string "pval" or a function that computes the psi value and its normalizer
+(optional). If \code{psi="pval"}, default psi functions based on p-values is
+used. For user-specific psi function, please see hFDR::psi.guasslinear for an
+example of the format.}
+
+\item{se}{logical. Estimate the standard error of FDR estimator or not
+(default).}
+
+\item{n_sample.hfdr}{number of Monte-Carlo samples used to estimate FDR when
+\code{select} is a user-specified function.}
+
+\item{n_sample.se}{number of Bootstrap samples used to estimate the standard
+error of the FDR estimator when \code{se=True}.}
+
+\item{n_cores}{number of cores to be used in computing the FDR estimator
+parallelly.}
+}
+\value{
+An object of class \code{hFDR}.
+ \item{lambda}{the values of lambda used.}
+ \item{hFDR}{the estimated FDR - a vector of length length(lambda).}
+ \item{hFDR.decompose}{the estimated FDR contribution from each variable (or
+ variable pair in the Gaussian graphical model). It is a matrix of size
+ p-by-length(lambda) (or size (p(p-1)/2)-by-length(lambda) in the Gaussian
+ graphical model). Summing over the columns of \code{hFDR.decompose} gives
+ \code{hFDR}.}
+ \item{hFDR.se}{the estimated standard error of \code{hFDR} - a vector of
+ length length(lambda). Equals NULL if \code{se=False}.}
+}
 \description{
-Document will be ready soon
+Estimates the FDR of a selection procedure at regularity parameter lambda.
+}
+\details{
+In the model-X settings, if users want to specify the distribution of X,
+ then argument \code{modelX} should be a list of functions that include items
+ of the following.
+
+ \code{sampler.modelX}: a function that takes \code{(X, indices, sample_size)}
+ and generates \code{sample_size} samples of explanatory variables indexed by
+ \code{indices} conditioning on the others variables in the data matrix
+ \code{X}.
+
+ \code{pred_fit}: Optional. a function that takes arguments (X.new, X, y,
+ lambda). It train a model with (X, y) at regularity parameters lambda and
+ predict the response at X.new. The return must be a matrix of size
+ NROW(X.new) by length(lambda). s.e.(hFDR) is estimated via
+ bootstrap sampling from a sparse model. If \code{pred_fit} is provided, the
+ sparse model is obtained by cross-validation using \code{pred_fit}.
+ Otherwise the sparse model consists of the variables with \code{psi!=0}.
+}
+\examples{
+p <- 100; n <- 300; k <- 15
+X <- matrix(rnorm(n*p), n)
+nonzero <- sample(p, k)
+beta <- 1 * (1:p \%in\% nonzero)
+y <- X \%*\% beta + rnorm(n)
+
+n_lambda <- 40
+lambda_max <- max(abs(t(scale(X, TRUE, FALSE)) \%*\% scale(y, TRUE, FALSE))) / n
+sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
+lambda_min <- sigma / sqrt(n) / 10
+lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
+
+# simple example for Lasso selection. See more examples in the vignettes.
+glmnet.cv <- glmnet::cv.glmnet(X, y, alpha = 1, nfolds = 10,
+                       intercept = TRUE, standardize = TRUE, family = "gaussian")
+
+hFDR.res <- hFDR(X, y, model = "gausslinear", select = "lasso",
+                 lambda = lambda, psi = "pval")
+
+plot(hFDR.res, glmnet.cv)
+
 }

@@ -1,5 +1,3 @@
-
-
 hFDR.gaussgraph <- function(X, select, lambda, psi, n_sample.hfdr, n_cores){
   nlambda <- length(lambda)
   p <- NCOL(X)
@@ -26,7 +24,7 @@ hFDR.gaussgraph <- function(X, select, lambda, psi, n_sample.hfdr, n_cores){
 
     X.samples <- sampler.gaussgraph(X, i, j, n_sample.hfdr)
 
-    mc.samples <- forall(mc_i = 1:n_sample.hfdr, .options.multicore = list(preschedule = F)) %exec% {
+    mc.samples <- forall(mc_i = 1:n_sample.hfdr, .options.multicore = list(preschedule = T)) %exec% {
       X.sample <- X
       X.sample[, i] <- X.samples$Xi[, mc_i]
       X.sample[, j] <- X.samples$Xj[, mc_i]

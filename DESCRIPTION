@@ -1,15 +1,27 @@
 Package: hFDR
 Type: Package
-Title: What the Package Does (Title Case)
+Title: FDR estimation for variable selection procedures
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Date: 2024-04-24
+Authors@R: 
+    c(person("Yixiang", "Luo", role = c("aut", "cre"),
+             email="yixiangluo@berkeley.edu"),
+      person("William", "Fithian", role = c("ctb")),
+      person("Lihua", "Lei", role = c("ctb")))
+Maintainer: Yixiang Luo <yixiangluo@berkeley.edu>
+Description: Estimates the FDR of a selection procedure at regularity parameter lambda.
+    It produces conservatively biased FDR estimation for any variable selection procedure.
+License: MIT + file LICENSE
 Encoding: UTF-8
 LazyData: true
-Suggests: 
+Imports: 
+    glmnet,
+    glasso,
+Suggests:
+    CVXR,
+    doParallel,
+    parallel,
+    foreach,
     knitr,
     rmarkdown
 VignetteBuilder: knitr

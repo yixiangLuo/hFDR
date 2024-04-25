@@ -1,4 +1,18 @@
-#' Document will be ready soon
+#' Default psi function in Gaussian linear model that thresholds variables by
+#' their two-sided t-test p-values.
+#'
+#' @param X n-by-p matrix of explanatory variables.
+#' @param y response vector of length n.
+#' @param variables a sequence of indices of variables whose psi is to be
+#' calculated.
+#' @param threshold psi = 1 if the p-value of the variable is above threshold,
+#' otherwise psi = 0.
+#'
+#' @return a list.
+#'  \item{psi}{psi values of the variables}
+#'  \item{normalizer}{the conditional expectation of psi given Sj and under the
+#'  null Hj. This item is optional. If normalizer is not specified (NULL), it
+#'  will be calculated approximately when called by hFDR::hFDR using Monte-Carlo.}
 #'
 #' @export
 psi.guasslinear <- function(X, y, variables, threshold = 0.1){
@@ -22,7 +36,25 @@ psi.guasslinear <- function(X, y, variables, threshold = 0.1){
   return(list(psi = psi, normalizer = normalizer))
 }
 
-#' Document will be ready soon
+#' Default psi function in model-X settings with multivariate Gaussian X that
+#' thresholds variables by their conditional randomization test p-values. The
+#' test statistic is the absolute marginal covariance between the response y
+#' and each explanatory variable.
+#'
+#' @param X n-by-p matrix of explanatory variables.
+#' @param y response vector of length n.
+#' @param variables a sequence of indices of variables whose psi is to be
+#' calculated.
+#' @param X.mean length p mean vector of the explanatory variables.
+#' @param X.cov p-by-p covariance matrix of explanatory variables.
+#' @param threshold psi = 1 if the p-value of the variable is above threshold,
+#' otherwise psi = 0.
+#'
+#' @return a list.
+#'  \item{psi}{psi values of the variables}
+#'  \item{normalizer}{the conditional expectation of psi given Sj and under the
+#'  null Hj. This item is optional. If normalizer is not specified (NULL), it
+#'  will be calculated approximately when called by hFDR::hFDR using Monte-Carlo.}
 #'
 #' @export
 psi.modelX.gauss <- function(X, y, variables, X.mean, X.cov, threshold = 0.1){
@@ -42,7 +74,21 @@ psi.modelX.gauss <- function(X, y, variables, X.mean, X.cov, threshold = 0.1){
   return(list(psi = psi, normalizer = normalizer))
 }
 
-#' Document will be ready soon
+#' Default psi function in the Gaussian graphical model that
+#' thresholds variables by their two-sided t-test p-values.
+#'
+#' @param X n-by-p matrix of the variables.
+#' @param pair_inds a sequence of indices of pairs of variables whose psi is to
+#' be calculated. Converting a variable pair (i,j) to the pair index and vice
+#' versa can be found in hFDR:::pair_to_index and hFDR:::index_to_pair.
+#' @param threshold psi = 1 if the p-value of the variable is above threshold,
+#' otherwise psi = 0.
+#'
+#' @return a list.
+#'  \item{psi}{psi values of the variables}
+#'  \item{normalizer}{the conditional expectation of psi given Sj and under the
+#'  null Hj. This item is optional. If normalizer is not specified (NULL), it
+#'  will be calculated approximately when called by hFDR::hFDR using Monte-Carlo.}
 #'
 #' @export
 psi.gaussgraph <- function(X, pair_inds, threshold = 0.1){

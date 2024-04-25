@@ -2,10 +2,21 @@
 % Please edit documentation in R/select.R
 \name{select.glasso}
 \alias{select.glasso}
-\title{Document will be ready soon}
+\title{Conditionally dependence pair selection by graphical lasso}
 \usage{
 select.glasso(X, lambda)
 }
+\arguments{
+\item{X}{n-by-p matrix of multivariate Gaussian variables.}
+
+\item{lambda}{regularity parameter sequence.}
+}
+\value{
+a logical matrix of size (p(p-1)/2)-by-length(lambda). An entry equals
+ True iff the corresponding pair (row) is selected at the corresponding
+ lambda (column). Converting a variable pair (i,j) to the column index and
+ vice versa can be found in hFDR:::pair_to_index and hFDR:::index_to_pair.
+}
 \description{
-Document will be ready soon
+Conditionally dependence pair selection by graphical lasso
 }

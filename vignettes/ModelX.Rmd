@@ -1,0 +1,143 @@
+---
+title: "Usage of the hFDR package with model-X settings"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{ModelX}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+
+This vignette illustrates the usage of the `hFDR` package for estimating the FDR of variable selection procedures in the model-X settings.
+
+For simplicity, we will use synthetic data constructed from a logistic regression model such that the response only depends on a small fraction of the variables.
+
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+set.seed(2024)
+library(hFDR)
+```
+
+```{r define-problem, results='hide', message=FALSE, warning=FALSE}
+# Problem parameters
+p <- 100           # number of variables
+n <- 500           # number of observations
+k <- 10            # number of variables with nonzero coefficients
+amplitude <- 10   # signal amplitude
+
+# Generate the variables from a multivariate normal distribution
+mu <- rep(0,p)
+rho <- 0.25
+Sigma <- toeplitz(rho^(0:(p-1)))
+X.sample <- function(){
+  matrix(rnorm(n*p), n) %*% chol(Sigma)
+}
+X <- X.sample()
+
+# Generate the response from a logistic regresion model
+nonzero <- sample(p, k)
+beta <- amplitude * (1:p %in% nonzero) / sqrt(n)
+y <- rbinom(n, 1, 1 / (1 + exp(-X %*% beta)))
+```
+
+Example 1. Logistic regression selection with estimated distribution of multivariate Gaussian X
+--------------
+
+By default, `hFDR` assumes the variables follow multivariate Gaussian distribution and employs the sample mean and covariance of X to generate Monte-Carlo samples in computing the FDR estimator.
+```{r hFDR-auto, message=F, warning=F, fig.width=7, fig.height=4.5}
+glmnet.cv <- glmnet::cv.glmnet(X, y, alpha = 1, nfolds = 10,
+                               intercept = T, standardize = T, family = "binomial")
+
+hFDR.res <- hFDR(X, y, model = "modelX", modelX = "auto.gaussian",
+                 select = select.logistic, lambda = glmnet.cv$lambda,
+                 psi = "pval", se = F, n_sample.hfdr = 20, n_cores = 2)
+plot(hFDR.res, glmnet.cv)
+```
+
+With standard error estimation
+```{r hFDR-auto-se, message=F, warning=F, fig.width=7, fig.height=4.5}
+hFDR.res <- hFDR(X, y, model = "modelX", modelX = "auto.gaussian",
+                 select = select.logistic, lambda = glmnet.cv$lambda,
+                 psi = "pval", se = T, n_sample.hfdr = 20, n_sample.se = 10, n_cores = 2)
+plot(hFDR.res, glmnet.cv)
+```
+
+Compare with FDR and FDP in the simulation setting.
+```{r hFDR-FDR-lasso, message=F, warning=F, fig.width=7, fig.height=4.5}
+calc_FDP <- function(selected, nonzero){
+  p <- NROW(selected)
+  nonzero <- (1:p) %in% nonzero
+  colSums(selected * !nonzero) / pmax(colSums(selected), 1)
+}
+
+FDP <- calc_FDP(select.logistic(X, y, glmnet.cv$lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  X.mc <- X.sample()
+  y.mc <- rbinom(n, 1, 1 / (1 + exp(-X.mc %*% beta)))
+  calc_FDP(select.logistic(X.mc, y.mc, glmnet.cv$lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+
+plot(hFDR.res, glmnet.cv)
+lines(x = -log(glmnet.cv$lambda), y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = -log(glmnet.cv$lambda), y = FDR, col = "black", lty = 1)  # solid black line for FDR
+```
+
+Example 2. Logistic regression selection with user-defined X distribution
+--------------
+Users can specify the distribution of X via a conditional sampling function for X.
+
+```{r modelX-user-defined, results='hide', message=F, warning=F}
+X.mean <- rep(0, p)
+X.cov <- Sigma
+
+modelX <- list(
+  # Specify the distribution of X via a conditional sampling function for X.
+  # See hFDR::sampler.modelX.gauss for details.
+  sampler.modelX = function(X, ind, sample_size, storage = NULL){
+    sampler.modelX.gauss(X, ind, X.mean = X.mean, X.cov = X.cov, sample_size, storage)
+  },
+  # Optional. Users can provide the `pred_fit` function if they have believe a
+  # model assumption that relate X and y.
+  # The function `pred_fit` affect how we estimate the standard error of hFDR.
+  # s.e.(hFDR) is estimated via bootstrap sampling from a sparse model.
+  # If function `pred_fit` is provided, the sparse model is obtained by 
+  # cross-validation using \code{pred_fit}.
+  # Otherwise the sparse model consists of the variables with \code{psi!=0}.
+  # `pred_fit` should be a function that trains a model with (X, y) at regularity
+  # parameters lambda and predicts the response at X.new. The return must be a 
+  # matrix of size NROW(X.new) by length(lambda).
+  pred_fit = function(X.new, X, y, lambda){
+    pred_fit.model(X.new, X, y, select.logistic, lambda, pred_fit.mle.logistic)
+  }
+)
+
+# define the psi function based on the distribution of X accordingly
+psi <- function(X, y, variables){
+  psi.modelX.gauss(X, y, variables, X.mean = X.mean, X.cov = X.cov, threshold = 0.1)
+}
+```
+
+
+
+```{r hFDR-user-defined, message=F, warning=F, fig.width=7, fig.height=4.5}
+glmnet.cv <- glmnet::cv.glmnet(X, y, alpha = 1, nfolds = 10,
+                               intercept = T, standardize = T, family = "binomial")
+
+hFDR.res <- hFDR(X, y, model = "modelX", modelX = modelX,
+                 select = select.logistic, lambda = glmnet.cv$lambda,
+                 psi = psi, se = T, n_sample.hfdr = 20, n_sample.se = 10, n_cores = 2)
+plot(hFDR.res, glmnet.cv)
+
+# compare with FDR and FDP in the simulation setting
+FDP <- calc_FDP(select.logistic(X, y, glmnet.cv$lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  X.mc <- X.sample()
+  y.mc <- rbinom(n, 1, 1 / (1 + exp(-X.mc %*% beta)))
+  calc_FDP(select.logistic(X.mc, y.mc, glmnet.cv$lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+lines(x = -log(glmnet.cv$lambda), y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = -log(glmnet.cv$lambda), y = FDR, col = "black", lty = 1)  # solid black line for FDR
+```

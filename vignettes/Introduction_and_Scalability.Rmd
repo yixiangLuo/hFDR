@@ -1,0 +1,169 @@
+---
+title: "Introduction to the hFDR package and its scalability"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction_and_Scalability}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\usepackage[utf8]{inputenc}
+---
+
+
+This vignette illustrates the usage of the `hFDR` package for estimating the FDR of variable selection procedures. We take Lasso selection in the Gaussian linear model for example. For details in the Gaussian linear model, model-X settings, and Gaussian graphical model, please refer to vignettes `GaussianLinear`, `ModelX`, and `GaussianGraph`, respectively.
+
+For simplicity, we will use synthetic data constructed from a linear model such that the response only depends on a small fraction of the variables.
+
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+set.seed(2024)
+library(hFDR)
+```
+
+```{r define-problem, results='hide', message=FALSE, warning=FALSE}
+# Problem parameters
+p <- 100           # number of variables
+n <- 300           # number of observations
+k <- 15            # number of variables with nonzero coefficients
+amplitude <- 3   # signal amplitude (for noise level = 1)
+
+# Generate the variables from a multivariate normal distribution
+mu <- rep(0,p)
+rho <- 0.25
+Sigma <- toeplitz(rho^(0:(p-1)))
+X <- matrix(rnorm(n*p), n) %*% chol(Sigma)
+
+# Generate the response from a linear model
+nonzero <- sample(p, k)
+beta <- amplitude * (1:p %in% nonzero) / sqrt(n)
+y.sample <- function() X %*% beta + rnorm(n) + 100
+y <- y.sample()
+```
+
+First example with recommended practice
+--------------
+
+In the Gaussian linear model with argument `select = "lasso"`, we use a homotopy algorithm to compute the FDR estimator. This algorithm is fast for a large lambda (not many 
+selections) and become slower for a smaller lambda (many selections). And it computes FDR
+estimation for each lambda separately.
+
+For a problem with sparse signal variables, FDR already reaches high with not too many selections. And hence in most cases it is enough to compute the FDR estimator up to a not very small lambda.
+
+For efficiency consideration, we recommend taking the following steps in using hFDR.
+
+1. Start with a lambda sequence whose values are not too small. Compute hFDR without estimating the standard error. This will give the user a sense of the running time the FDR.
+```{r lasso-lambda, message=FALSE, warning=FALSE, fig.width=7, fig.height=4.5}
+# generate lambda sequence for lasso
+n_lambda <- 10
+lambda_max <- max(abs(t(scale(X, T, F)) %*% scale(y, T, F))) / n
+sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
+lambda_min <- sigma / sqrt(n)
+lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
+
+# compute hFDR with only 10 lambda and measure the time spent
+start.time <- Sys.time()
+hFDR.res <- hFDR(X, y, model = "gausslinear", select = "lasso", lambda = lambda,
+                 psi = "pval", n_cores = 2)
+end.time <- Sys.time()
+print(paste0("Runtime: ", round(as.numeric(difftime(end.time, start.time, units = "secs")), digits = 1), "s."))
+
+plot(hFDR.res)
+```
+
+2. Based on the computational budget, compute hFDR and its standard error estimation for more values of lambda.
+```{r hFDR-lasso-cv, message=F, warning=F, fig.width=7, fig.height=4.5}
+glmnet.cv <- glmnet::cv.glmnet(X, y, alpha = 1, nfolds = 10,
+                               intercept = T, standardize = T, family = "gaussian")
+
+# generate lambda sequence for lasso up to a smaller lambda
+n_lambda <- 40
+lambda_max <- max(abs(t(scale(X, T, F)) %*% scale(y, T, F))) / n
+sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
+lambda_min <- sigma / sqrt(n) / 5
+lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
+
+start.time <- Sys.time()
+hFDR.res <- hFDR(X, y, model = "gausslinear", select = "lasso", lambda = lambda, 
+                 psi = "pval", se = T, n_sample.se = 10, n_cores = 2)
+end.time <- Sys.time()
+print(paste0("Runtime: ", round(as.numeric(difftime(end.time, start.time, units = "secs")), digits = 1), "s."))
+
+plot(hFDR.res, glmnet.cv)
+```
+
+In this simulation problem, we can compare hFDR with the true FDR and FDP.
+```{r hFDR-FDR-lasso, message=F, warning=F, fig.width=7, fig.height=4.5}
+calc_FDP <- function(selected, nonzero){
+  p <- NROW(selected)
+  nonzero <- (1:p) %in% nonzero
+  colSums(selected * !nonzero) / pmax(colSums(selected), 1)
+}
+
+FDP <- calc_FDP(select.lasso(X, y, lambda), nonzero)
+FDR <- sapply(1:100, function(mc_i){
+  y.mc <- y.sample()
+  calc_FDP(select.lasso(X, y.mc, lambda), nonzero)
+})
+FDR <- rowMeans(FDR)
+
+plot(hFDR.res, glmnet.cv)
+lines(x = -log(lambda), y = FDP, col = "black", lty = 2)  # dashed black line for FDP
+lines(x = -log(lambda), y = FDR, col = "black", lty = 1)  # solid black line for FDR
+```
+
+
+Scalability example
+--------------
+
+We test the scalability of hFDR on 10 different lambda that result in the estimated FDR ranging from 0 to 0.8, when apply the homotopy algorithm to the Lasso selection, as the number of variables increases.
+```{r generate-data, results='hide', message=FALSE, warning=FALSE}
+gene_data <- function(p){
+  n <- 3*p           # number of observations
+  k <- round(0.1*p)  # 10 percents variables with nonzero coefficients
+  amplitude <- 3     # signal amplitude
+  
+  # same settings as the example above
+  mu <- rep(0,p)
+  rho <- 0.25
+  Sigma <- toeplitz(rho^(0:(p-1)))
+  X <- matrix(rnorm(n*p), n) %*% chol(Sigma)
+  
+  # same settings as the example above
+  nonzero <- sample(p, k)
+  beta <- amplitude * (1:p %in% nonzero) / sqrt(n)
+  y <- X %*% beta + rnorm(n) + 100
+  
+  return(list(X = X, y = y))
+}
+```
+
+We see the calculation is fast and it is scalable. But please be aware if we add some tiny lambda into the calculation, we may learn very little more about the FDR because it is almost flat and close to 1, but computation time could increases by a lot.
+```{r scalability, message=FALSE, warning=FALSE, fig.width=4.5, fig.height=4}
+p_seq <- c(100, 200, 400, 800)
+runtime <- sapply(p_seq, function(p){
+  data <- gene_data(p)
+  X <- data$X
+  y <- data$y
+  
+  n <- 3 * p
+  
+  n_lambda <- 10
+  lambda_max <- max(abs(t(scale(X, T, F)) %*% scale(y, T, F))) / n
+  sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
+  lambda_min <- sigma*sqrt(2*log(p))/sqrt(n)/5
+  lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
+  
+  # compute hFDR with only 10 lambda and measure the time spent
+  start.time <- Sys.time()
+  hFDR.res <- hFDR(X, y, model = "gausslinear", select = "lasso", lambda = lambda,
+                   psi = "pval", n_cores = 1)
+  end.time <- Sys.time()
+  print(paste0(p, " variables", ", hFDR: ", paste(round(hFDR.res$hFDR, digits = 2), collapse = " ")))
+  as.numeric(difftime(end.time, start.time, units = "secs"))
+})
+
+plot(p_seq, runtime, log = "xy", type = "b", pch = 19, col = "black",
+     xlab = "number of variables", ylab = "running time (s)")
+
+slope <- round(lm(log(runtime)~log(p_seq) + 1)$coefficients[2], digits = 0)
+print(paste0("fitted slope = ", slope, ", So the runtime is roughly O(p^", slope, ")."))
+```
