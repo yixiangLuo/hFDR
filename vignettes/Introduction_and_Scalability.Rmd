@@ -118,7 +118,7 @@ We test the scalability of hFDR on 10 different lambda that result in the estima
 ```{r generate-data, results='hide', message=FALSE, warning=FALSE}
 gene_data <- function(p){
   n <- 3*p           # number of observations
-  k <- round(0.1*p)  # 10 percents variables with nonzero coefficients
+  k <- 10            # number of variables with nonzero coefficients
   amplitude <- 3     # signal amplitude
   
   # same settings as the example above
@@ -149,7 +149,7 @@ runtime <- sapply(p_seq, function(p){
   n_lambda <- 10
   lambda_max <- max(abs(t(scale(X, T, F)) %*% scale(y, T, F))) / n
   sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
-  lambda_min <- sigma*sqrt(2*log(p))/sqrt(n)/5
+  lambda_min <- sigma*sqrt(2*log(p))*log(p)/sqrt(n)/20
   lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
   
   # compute hFDR with only 10 lambda and measure the time spent
