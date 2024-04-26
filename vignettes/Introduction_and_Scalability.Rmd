@@ -138,7 +138,7 @@ gene_data <- function(p){
 
 We see the calculation is fast and it is scalable. But please be aware if we add some tiny lambda into the calculation, we may learn very little more about the FDR because it is almost flat and close to 1, but computation time could increases by a lot.
 ```{r scalability, message=FALSE, warning=FALSE, fig.width=4.5, fig.height=4}
-p_seq <- c(100, 400, 800, 1600, 2400)
+p_seq <- c(200, 400, 800, 1600, 3200)
 runtime <- sapply(p_seq, function(p){
   data <- gene_data(p)
   X <- data$X
@@ -148,11 +148,11 @@ runtime <- sapply(p_seq, function(p){
   
   n_lambda <- 10
   lambda_max <- max(abs(t(scale(X, T, F)) %*% scale(y, T, F))) / n
-  ## Pick lambda_min where the number of active variables is 75 (slight cheat)
+  ## Pick lambda_min where the number of active variables is 75 (slight cheat since we know k = 15)
   glmnet.obj <- glmnet::glmnet(X, y, alpha = 1,
                                intercept = T, standardize = T, family = "gaussian")
   nsel <- apply(glmnet.obj$beta,MARGIN=2,FUN=function(b) sum(abs(b) > 0))
-  lambda_min <- with(glmnet.obj, min(lambda[nsel >= 75]))
+  lambda_min <- with(glmnet.obj, max(lambda[nsel >= 75]))
   
   ## Non-cheating version which does a slightly worse job of estimating the scaling law
   #sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
