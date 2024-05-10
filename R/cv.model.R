@@ -67,16 +67,16 @@ cv.model <- function(X, y, lambda, pred_fit, select = NULL, nfold = 10){
   nzero <- if(is.function(select)) colSums(select(X, y, lambda)) else NULL
 
   cv.obj <- structure(list(call = match.call(),
-                               lambda = lambda,
-                               cvm = MSE.mean,
-                               cvsd = MSE.std,
-                               cvup = MSE.mean+MSE.std,
-                               cvlo = MSE.mean-MSE.std,
-                               nzero = nzero,
-                               name = "Mean-Squared Error",
-                               lambda.min = lambda[ind.min],
-                               lambda.1se = lambda[ind.1se],
-                               index = index),
+                           lambda = lambda,
+                           cvm = MSE.mean,
+                           cvsd = MSE.std,
+                           cvup = MSE.mean+MSE.std,
+                           cvlo = MSE.mean-MSE.std,
+                           nzero = nzero,
+                           name = "Mean-Squared Error",
+                           lambda.min = lambda[ind.min],
+                           lambda.1se = lambda[ind.1se],
+                           index = index),
                           class = 'cv.obj')
 
   return(cv.obj)

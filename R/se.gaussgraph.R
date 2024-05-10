@@ -8,7 +8,7 @@ se.gaussgraph <- function(X, select, lambda, psi, n_sample.hfdr, n_sample.se, n_
 
   cv.res <- cv.gaussgraph(X, lambda, precision.est, nfold = 10)
 
-  hPrecision <- precision.est(X, cv.res$lambda.min)
+  hPrecision <- precision.est.mle.sparse(X, select, cv.res$lambda.min, precise = T)
   hSigma <- base::solve(hPrecision)
   R <- chol(hSigma)
 

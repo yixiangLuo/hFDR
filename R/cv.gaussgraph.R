@@ -87,16 +87,16 @@ cv.gaussgraph <- function(X, lambda, precision.est, select = NULL,
   name <- ifelse(type.measure == "-loglikelihood", "-Log Likelihood", "Mean-Squared Error")
 
   cv.obj <- structure(list(call = match.call(),
-                              lambda = lambda,
-                              cvm = measure.mean,
-                              cvsd = measure.std,
-                              cvup = measure.mean+measure.std,
-                              cvlo = measure.mean-measure.std,
-                              nzero = nzero,
-                              name = name,
-                              lambda.min = lambda[ind.min],
-                              lambda.1se = lambda[ind.1se],
-                              index = index),
+                           lambda = lambda,
+                           cvm = measure.mean,
+                           cvsd = measure.std,
+                           cvup = measure.mean+measure.std,
+                           cvlo = measure.mean-measure.std,
+                           nzero = nzero,
+                           name = name,
+                           lambda.min = lambda[ind.min],
+                           lambda.1se = lambda[ind.1se],
+                           index = index),
                          class = 'cv.obj')
 
   return(cv.obj)
