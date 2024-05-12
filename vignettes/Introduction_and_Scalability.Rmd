@@ -118,8 +118,8 @@ We test the scalability of hFDR on 10 different lambda that result in the estima
 ```{r generate-data, results='hide', message=FALSE, warning=FALSE}
 gene_data <- function(p){
   n <- 3*p           # number of observations
-  k <- 10            # number of variables with nonzero coefficients
-  amplitude <- 3     # signal amplitude
+  k <- 15            # number of variables with nonzero coefficients
+  amplitude <- sqrt(2*log(p))*1.5     # signal amplitude
   
   # same settings as the example above
   mu <- rep(0,p)
@@ -138,7 +138,7 @@ gene_data <- function(p){
 
 We see the calculation is fast and it is scalable. But please be aware if we add some tiny lambda into the calculation, we may learn very little more about the FDR because it is almost flat and close to 1, but computation time could increases by a lot.
 ```{r scalability, message=FALSE, warning=FALSE, fig.width=4.5, fig.height=4}
-p_seq <- c(200, 400, 800, 1600, 3200)
+p_seq <- c(200, 400, 800, 1600)
 runtime <- sapply(p_seq, function(p){
   data <- gene_data(p)
   X <- data$X

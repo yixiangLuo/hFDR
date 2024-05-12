@@ -83,18 +83,6 @@ hFDR.lasso <- function(data.pack, lambda, psi, n_cores){
       }
     }
 
-    # hFDRj.all <- forall(j = 1:p, .options.multicore = list(preschedule = T)) %exec% {
-    #   Xjy_range <- Xy_range[, j]
-    #   if(psi.val[j] == 0){
-    #     hFDRj <- 0
-    #   } else{
-    #     lasso.homopath <- lasso.homotopy(lasso.pack, j, Xjy_range)
-    #     hFDRj <- integral.hFDRj_star(lasso.homopath, j, Xjy_range, data.pack, tol) * psi.val[j] / normalizer[j]
-    #   }
-    #   return(hFDRj)
-    # }
-    # hFDRj.all <- do.call(c, hFDRj.all)
-
     return(hFDRj.all)
   })
 
