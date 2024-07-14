@@ -38,6 +38,16 @@ NULL
 #' @export
 plot.hFDR <- function(hFDR.obj, cv.obj = NULL, sign.lambda = -1,
                       log_lambda = T, log_cv = F, show_legend = !is.null(cv.obj)){
+  if(requireNamespace("latex2exp", quietly=T)) {
+    hFDR_text <- latex2exp::TeX("$\\widehat{FDR}$")
+    lambda_text <- latex2exp::TeX("$\\lambda$")
+    loglambda_text <- latex2exp::TeX("$\\log(\\lambda)$")
+  } else{
+    hFDR_text <- "est FDR"
+    lambda_text <- "lambda"
+    loglambda_text <- "log(lambda)"
+  }
+
   trans_x <- if(log_lambda) {function(x) log(x)} else identity
 
   hFDR_margin <- if(is.null(hFDR.obj$hFDR.se)) 0.05 else hFDR.obj$hFDR.se
@@ -53,7 +63,7 @@ plot.hFDR <- function(hFDR.obj, cv.obj = NULL, sign.lambda = -1,
                     ylim = plot.range,
                     type = "n")
 
-  par(mar = c(4,4,3,4), cex = 1, cex.axis = 1, cex.lab = 1)
+  par(mar = c(4.2,4.2,3.2,4.2), cex = 1, cex.axis = 1, cex.lab = 1)
   do.call("plot", plot.args)
 
   leg <- c()
@@ -82,8 +92,8 @@ plot.hFDR <- function(hFDR.obj, cv.obj = NULL, sign.lambda = -1,
                cv.transfer(cv.up), cv.transfer(cv.low),
                width = 0.01, col = paste0(cv.color, as.hexmode(round(0.2*255))))
 
-    abline(v = sign.lambda * trans_x(cv.obj$lambda[cv.obj$ind.min]), lty = 1, col = cv.color)
-    abline(v = sign.lambda * trans_x(cv.obj$lambda[cv.obj$ind.1se]), lty = 2, col = cv.color)
+    abline(v = sign.lambda * trans_x(cv.obj$lambda.min), lty = 1, col = cv.color)
+    abline(v = sign.lambda * trans_x(cv.obj$lambda.1se), lty = 2, col = cv.color)
 
     cv.leg <- if(cv.obj$name == "Mean-Squared Error") "CV MSE" else "CV"
     leg <- c(leg, cv.leg)
@@ -103,7 +113,7 @@ plot.hFDR <- function(hFDR.obj, cv.obj = NULL, sign.lambda = -1,
   points(sign.lambda*trans_x(hFDR.obj$lambda), hFDR.obj$hFDR,
          pch = 20, col = hFDR.color)
 
-  leg <- c(leg, "est FDR")
+  leg <- c(leg, hFDR_text)
   lty <- c(lty, 1)
   lwd <- c(lwd, 0)
   pch <- c(pch, 19)
@@ -113,7 +123,7 @@ plot.hFDR <- function(hFDR.obj, cv.obj = NULL, sign.lambda = -1,
     if(!is.null(cv.obj$nzero)){
       axis(side = 3, at = sign.lambda*trans_x(cv.obj$lambda),
            labels = paste(cv.obj$nzero), tick = FALSE, line = -0.5)
-      mtext("# selections", side = 3, line = 2)
+      mtext("# variables selected", side = 3, line = 2, cex = 1.3)
     }
 
     cv.ticks <- if(log_cv){
@@ -121,7 +131,7 @@ plot.hFDR <- function(hFDR.obj, cv.obj = NULL, sign.lambda = -1,
     } else { seq(cv.range[1], cv.range[2], length.out = 6) }
     axis(side = 4, at = cv.transfer(cv_scale(cv.ticks)),
          labels = formatC(cv.ticks, format = "g", digits = 2), tick = T, line = 0)
-    mtext(cv.leg, side = 4, line = 2.5)  # "-log likelihood (cv)"
+    mtext(cv.leg, side = 4, line = 2.5, cex = 1.3)  # "-log likelihood (cv)"
 
     if(show_legend) suppressWarnings({
       legend.pos <- legend("bottomright", inset = 0.05,
@@ -144,9 +154,9 @@ plot.hFDR <- function(hFDR.obj, cv.obj = NULL, sign.lambda = -1,
   }
 
 
-  xlab <- if(log_lambda) "log(lambda)" else "lambda"
+  xlab <- if(log_lambda) loglambda_text else lambda_text
   if(sign.lambda < 0) xlab <- paste("-", xlab, sep = "")
-  title(xlab = xlab, ylab = "False Discovery Rate", line = 2.5, cex.lab = 1)
+  title(xlab = xlab, ylab = "False Discovery Rate", line = 2.5, cex.lab = 1.3)
   invisible()
 }
 
