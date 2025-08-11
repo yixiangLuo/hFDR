@@ -6,11 +6,30 @@ hFDR.lasso <- function(data.pack, lambda, psi, n_cores){
   n <- NROW(X)
   p <- NCOL(X)
 
+  if(is.character(lambda)){
+    glmnet.cv <- glmnet::cv.glmnet(X, y, alpha = 1, nfolds = 10,
+                                   intercept = T, standardize = T, family = "gaussian")
+    lambda.min.ind <- which.min(glmnet.cv$cvm)
+    lambda.se.ind <- max(which(glmnet.cv$cvm <= glmnet.cv$cvup[lambda.min.ind]))
+    if(lambda == "auto"){
+      auto_lambda <- T
+      lambda <- glmnet.cv$lambda[1:lambda.se.ind]
+      lambda.calc.ind <- c(1, lambda.min.ind, lambda.se.ind)
+    } else{
+      auto_lambda <- F
+      lambda <- glmnet.cv$lambda[1:lambda.se.ind]
+      lambda.calc.ind <- 1:length(lambda)
+    }
+
+  } else {
+    auto_lambda <- F
+    lambda.calc.ind <- 1:length(lambda)
+  }
+
   homotopy.prepare <- lasso.homotopy.preprocess(X, y, lambda)
   tol <- homotopy.prepare$tol
 
   lambdas <- homotopy.prepare$lambdas
-  nlambda <- length(lambdas)
 
   debias <- psi(X, y, 1:p)
   psi.val <- debias$psi
@@ -24,71 +43,91 @@ hFDR.lasso <- function(data.pack, lambda, psi, n_cores){
   forall <- parallel$iterator
   `%exec%` <- parallel$connector
 
-  hFDRj.all <- sapply(1:nlambda, function(lambda_i){
-    selected <- homotopy.prepare$selected.list[[lambda_i]]
-    unselected <- which(!(1:p %in% selected))
-    lasso.pack <- list(X = X, Xy = homotopy.prepare$Xy,
-                       beta_lasso = homotopy.prepare$betas[, lambda_i],
-                       selected = selected,
-                       Sigma = homotopy.prepare$Sigma,
-                       Sigma_selected_inv = homotopy.prepare$Sigma_selected_inv.list[[lambda_i]],
-                       lambda = lambdas[lambda_i],
-                       tol = tol)
+  hFDRj.all <- matrix(0, nrow = p, ncol = length(lambdas))
+  lambda.done.ind <- c()
 
-    # get the range for Xj^T y condtional on Sj, with an adaptive early truncation
-    truncate_prob <- 0.01 * max(1, length(selected)) / p
-    vy_bound <- pmax(abs(vjy_quantile(truncate_prob, data.pack$RSS_Xnoj, df = n-p)), abs(data.pack$vjy_obs))
-    Xy_range <- sapply(1:p, function(j){
-      sort(c(vjy_to_Xjy(-vy_bound[j], data.pack$trans, j), vjy_to_Xjy(vy_bound[j], data.pack$trans, j)))
-    })
+  while(length(setdiff(lambda.calc.ind, lambda.done.ind)) > 0){
+    for(lambda_i in setdiff(lambda.calc.ind, lambda.done.ind)){
+      selected <- homotopy.prepare$selected.list[[lambda_i]]
+      unselected <- which(!(1:p %in% selected))
+      lasso.pack <- list(X = X, Xy = homotopy.prepare$Xy,
+                         beta_lasso = homotopy.prepare$betas[, lambda_i],
+                         selected = selected,
+                         Sigma = homotopy.prepare$Sigma,
+                         Sigma_selected_inv = homotopy.prepare$Sigma_selected_inv.list[[lambda_i]],
+                         lambda = lambdas[lambda_i],
+                         tol = tol)
 
-    # compute the conditional probability of being selected given Sj for those
-    # variables not selected in the realized data
-    sel_probs <- rep(1, p)
-    if(length(unselected) > 0){
-      sel_probs[unselected] <- prob.selected(unselected, Xy_range, lasso.pack, data.pack)
-    }
-    # approximate hFDRj by the estimated PFER / #selection * phi
-    hFDRj.approx <- sel_probs / max(1, length(selected)) * psi.val / normalizer
+      # get the range for Xj^T y condtional on Sj, with an adaptive early truncation
+      truncate_prob <- 0.01 * max(1, length(selected)) / p
+      vy_bound <- pmax(abs(vjy_quantile(truncate_prob, data.pack$RSS_Xnoj, df = n-p)), abs(data.pack$vjy_obs))
+      Xy_range <- sapply(1:p, function(j){
+        sort(c(vjy_to_Xjy(-vy_bound[j], data.pack$trans, j), vjy_to_Xjy(vy_bound[j], data.pack$trans, j)))
+      })
 
-    # devide all varaibles into three categories:
-    #   j.zero: hFDRj = 0
-    #   j.exact: whose hFDRj roughly takes a large proportion of hFDR. Compute their hFDRj exactly.
-    #   j.approx: whose hFDRj roughly takes a small proportion of hFDR. Compute their hFDRj approximately (but keeping conservative bias).
-    j.zero <- which(hFDRj.approx == 0)
-    j.exact <- which((1:p) %in% selected & psi.val > 0 | hFDRj.approx/sum(hFDRj.approx) > 0.1)
-    j.approx <- setdiff(1:p, c(j.zero, j.exact))
-    # for each j.approx, estimate hFDRj-hFDRj.approx by a random variable Dj = (hFDRj-hFDRj.approx)/j.approx.prob
-    # with probability j.approx.prob and = 0 o.w.
-    j.approx.prob <- pmax((hFDRj.approx/sum(hFDRj.approx))/0.1, 0.01)[j.approx]
-    # index for those Dj != 0
-    calc.index <- (runif(length(j.approx)) < j.approx.prob)
+      # compute the conditional probability of being selected given Sj for those
+      # variables not selected in the realized data
+      sel_probs <- rep(1, p)
+      if(length(unselected) > 0){
+        sel_probs[unselected] <- prob.selected(unselected, Xy_range, lasso.pack, data.pack)
+      }
+      # approximate hFDRj by the estimated PFER / #selection * phi
+      hFDRj.approx <- sel_probs / max(1, length(selected)) * psi.val / normalizer
 
-    hFDRj.all <- rep(0, p)
-    # compute hFDRj exactly for some of the variables
-    hFDRj.exact <- forall(j = c(j.exact, j.approx[calc.index]), .options.multicore = list(preschedule = T)) %exec% {
-      Xjy_range <- Xy_range[, j]
-      lasso.homopath <- lasso.homotopy(lasso.pack, j, Xjy_range)
-      hFDRj <- integral.hFDRj_star(lasso.homopath, j, Xjy_range, data.pack, tol) * psi.val[j] / normalizer[j]
-      return(hFDRj)
-    }
-    if(length(c(j.exact, calc.index)) > 0){
-      hFDRj.exact <- do.call(c, hFDRj.exact)
-      if(length(j.exact) > 0) hFDRj.all[j.exact] <- hFDRj.exact[1:length(j.exact)]
-      if(length(calc.index) > 0){
-        # sum of Dj over all j.approx
-        approx_err.est <- sum((hFDRj.exact[(length(j.exact)+1):length(hFDRj.exact)] - hFDRj.approx[j.approx[calc.index]]) / j.approx.prob[calc.index])
-        # compute hFDRj for j.approx approximately
-        hFDRj.all[j.approx] <- pmax(0, hFDRj.approx[j.approx] + approx_err.est / length(j.approx))
+      # devide all varaibles into three categories:
+      #   j.zero: hFDRj = 0
+      #   j.exact: whose hFDRj roughly takes a large proportion of hFDR. Compute their hFDRj exactly.
+      #   j.approx: whose hFDRj roughly takes a small proportion of hFDR. Compute their hFDRj approximately (but keeping conservative bias).
+      j.zero <- which(hFDRj.approx == 0)
+      j.exact <- which((1:p) %in% selected & psi.val > 0 | hFDRj.approx/sum(hFDRj.approx) > 0.1)
+      j.approx <- setdiff(1:p, c(j.zero, j.exact))
+      # for each j.approx, estimate hFDRj-hFDRj.approx by a random variable Dj = (hFDRj-hFDRj.approx)/j.approx.prob
+      # with probability j.approx.prob and = 0 o.w.
+      j.approx.prob <- pmax((hFDRj.approx/sum(hFDRj.approx))/0.1, 0.01)[j.approx]
+      # index for those Dj != 0
+      calc.index <- (runif(length(j.approx)) < j.approx.prob)
+
+      # compute hFDRj exactly for some of the variables
+      hFDRj.exact <- forall(j = c(j.exact, j.approx[calc.index]), .options.multicore = list(preschedule = T)) %exec% {
+        Xjy_range <- Xy_range[, j]
+        lasso.homopath <- lasso.homotopy(lasso.pack, j, Xjy_range)
+        hFDRj <- integral.hFDRj_star(lasso.homopath, j, Xjy_range, data.pack, tol) * psi.val[j] / normalizer[j]
+        return(hFDRj)
+      }
+      if(length(c(j.exact, calc.index)) > 0){
+        hFDRj.exact <- do.call(c, hFDRj.exact)
+        if(length(j.exact) > 0) hFDRj.all[j.exact, lambda_i] <- hFDRj.exact[1:length(j.exact)]
+        if(length(calc.index) > 0){
+          # sum of Dj over all j.approx
+          approx_err.est <- sum((hFDRj.exact[(length(j.exact)+1):length(hFDRj.exact)] - hFDRj.approx[j.approx[calc.index]]) / j.approx.prob[calc.index])
+          # compute hFDRj for j.approx approximately
+          hFDRj.all[j.approx, lambda_i] <- pmax(0, hFDRj.approx[j.approx] + approx_err.est / length(j.approx))
+        }
       }
     }
+    hFDR <- colSums(hFDRj.all)
+    lambda.done.ind <- lambda.calc.ind
 
-    return(hFDRj.all)
-  })
-
+    if(auto_lambda){
+      for(i in 1:(length(lambda.done.ind)-1)){
+        lambda_i.left <- lambda.done.ind[i]
+        lambda_i.right <- lambda.done.ind[i+1]
+        if(lambda_i.left < lambda.min.ind){
+          if(abs(hFDR[lambda_i.left] - hFDR[lambda_i.right]) > 0.025){
+            lambda.calc.ind <- c(lambda.calc.ind, floor((lambda_i.left+lambda_i.right)/2))
+          }
+        } else{
+          if(abs(hFDR[lambda_i.left] - hFDR[lambda_i.right]) > 0.05){
+            lambda.calc.ind <- c(lambda.calc.ind, floor((lambda_i.left+lambda_i.right)/2))
+          }
+        }
+      }
+      lambda.calc.ind <- sort(unique(lambda.calc.ind))
+    }
+  }
   hFDR <- colSums(hFDRj.all)
 
-  return(list(hFDR = hFDR, hFDR.decompose = hFDRj.all))
+  return(list(lambda = lambda[lambda.calc.ind], hFDR = hFDR[lambda.calc.ind], hFDR.decompose = hFDRj.all[, lambda.calc.ind]))
 }
 
 # compute the conditional probability of being selected given Sj for those

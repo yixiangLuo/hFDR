@@ -113,6 +113,7 @@ hFDR <- function(X, y = NULL, model = c("gausslinear", "modelX", "gaussgraph"),
       stop('`select` must be a function that performs variable select or the built-in "lasso" or "fs".')
     }
   })
+
   if(!is.function(select) && select == "lasso" & !requireNamespace("glmnet", quietly=T)) {
     stop("R package 'glmnet' is required but is not installed.")
   }
@@ -125,7 +126,12 @@ hFDR <- function(X, y = NULL, model = c("gausslinear", "modelX", "gaussgraph"),
   #   stop('`lambda` must be specified if `select` is a user-defined function.')
   # }
 
-  lambda <- lambda[round(seq(from = 1, to = length(lambda), length.out = nlambda))]
+  if(is.character(lambda) && (model != "gausslinear" || select != "lasso")){
+    stop('Auto lambda selection is currently only supported in lasso for Gaussian linear models.')
+  }
+  if(!is.character(lambda)){
+    lambda <- lambda[round(seq(from = 1, to = length(lambda), length.out = nlambda))]
+  }
 
   n_sample.hfdr <- as.integer(n_sample.hfdr)
   n_sample.se <- as.integer(n_sample.se)
@@ -137,6 +143,9 @@ hFDR <- function(X, y = NULL, model = c("gausslinear", "modelX", "gaussgraph"),
   if(model == "gausslinear"){
     if(!is.function(psi) && psi == "pval") psi <- psi.guasslinear
     hFDR.val <- hFDR.gausslinear(X, y, select, lambda, psi, n_sample.hfdr, n_cores)
+    if(is.character(lambda)){
+      lambda <- hFDR.val$lambda
+    }
     hFDR.se <- if(se){
       se.gausslinear(X, y, select, lambda, psi, n_sample.hfdr, n_sample.se, n_cores)
     } else { NULL }
