@@ -33,13 +33,6 @@ nonzero <- sample(p, k)
 beta <- amplitude * (1:p %in% nonzero) / sqrt(n)
 y.sample <- function() X %*% beta + rnorm(n) + 100
 y <- y.sample()
-
-# generate lambda sequence for lasso
-n_lambda <- 40
-lambda_max <- max(abs(t(scale(X, T, F)) %*% scale(y, T, F))) / n
-sigma <- sqrt(sum(lm(y ~ X)$residuals^2) / (n-p-1))
-lambda_min <- sigma / sqrt(n) / 10
-lambda <- lambda_max * (lambda_min/lambda_max)^((0:n_lambda)/n_lambda)
 ```
 
 ``` r
@@ -47,7 +40,12 @@ library(hFDR)
 library(glmnet)
 glmnet.cv <- glmnet::cv.glmnet(X, y, alpha = 1, nfolds = 10,
                                intercept = T, standardize = T, family = "gaussian")
+                               
+# generate lambda sequence
+lambda.lower <- max(which(glmnet.cv$cvm <= glmnet.cv$cvup[which.min(glmnet.cv$cvm)]))
+lambda <- glmnet.cv$lambda[1:lambda.lower]
 
+# compute FDR estimators with s.e. estimation by Bootstrap (computationally expensive)
 hFDR.res <- hFDR(X, y, model = "gausslinear", select = "lasso", lambda = lambda,
                  psi = "pval", se = T, n_sample.se = 10, n_cores = 2)
 
@@ -71,3 +69,7 @@ lines(x = -log(lambda), y = FDP, col = "black", lty = 2)  # dashed black line fo
 lines(x = -log(lambda), y = FDR, col = "black", lty = 1)  # solid black line for FDR
 ```
 ![hFDR example](readme/hFDR_example.png)
+
+```
+For discussion on the choice of lambda and computational efficiency/scalability, please see vignettes/Introduction_and_Scalability.Rmd
+```
